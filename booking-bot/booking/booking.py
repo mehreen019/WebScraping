@@ -35,34 +35,33 @@ class Booking(webdriver.Chrome):
     def dismiss_signin_popup(self):
         
         print("Dismissing sign in popup")
-
         try:
             close_button = self.find_element(By.CSS_SELECTOR,
                 '[aria-label="Dismiss sign in info."]')
             close_button.click()
         except Exception as e:
-            print('could not find the close button')
-            print(e)
+            #print('could not find the close button')
+            #print(e)
+            pass
 
-    def change_currency(self, currency="BDT"):
+    def change_currency(self, currency="INR"):
         currency_element = self.find_element(By.CSS_SELECTOR,
             '[data-testid="header-currency-picker-trigger"]'
         )
         currency_element.click()
 
-        # Wait for currency options and select BDT by text content
+        # Wait for currency options and select BDT by XPath
         currency_selection = self.find_element(By.XPATH,
-            f"//span[contains(@class, 'Picker_selection-text') and contains(text(), '{currency}')]"
+            f'//div[contains(@class, "CurrencyPicker_currency") and text()="{currency}"]'
         )
         currency_selection.click()
-
 
     def select_place_to_go(self, place_to_go):
         search_field = self.find_element(By.NAME, 'ss')
         search_field.clear()
         search_field.send_keys(place_to_go)
 
-        time.sleep(3);
+        time.sleep(1);
 
         first_result = self.find_element(By.ID,
             'autocomplete-result-0'
@@ -70,13 +69,16 @@ class Booking(webdriver.Chrome):
         first_result.click()
 
     def select_dates(self, check_in_date, check_out_date):
-        check_in_element = self.find_element(By.CSS_SELECTOR,
-            f'[data-date="{check_in_date}"]'
+
+        print("Selecting dates: ", check_in_date, check_out_date)
+
+        check_in_element = self.find_element(By.XPATH,
+            f'//div[@data-testid="searchbox-datepicker-calendar"]//span[@data-date="{check_in_date}"]'
         )
         check_in_element.click()
 
-        check_out_element = self.find_element(By.CSS_SELECTOR,
-            f'[data-date="{check_out_date}"]'
+        check_out_element = self.find_element(By.XPATH,
+            f'//div[@data-testid="searchbox-datepicker-calendar"]//span[@data-date="{check_out_date}"]'
         )
         check_out_element.click()
 
@@ -113,19 +115,75 @@ class Booking(webdriver.Chrome):
         search_button.click()
 
     def apply_filtrations(self):
-        filtration = BookingFiltration(driver=self)
-        filtration.apply_star_rating(4, 5)
+        # Add explicit wait before applying filtration
+        wait = WebDriverWait(self, 10)
+        try:
+            # Wait for the page to be fully loaded
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="property-card"]')))
+            
+            filtration = BookingFiltration(driver=self)
+            # Add small delay to ensure filters are interactive
+            time.sleep(2)
+            filtration.apply_star_rating(4, 5)
+            
+            
+        except Exception as e:
+            print(f"Error during filtration: {e}")
 
-        filtration.sort_price_lowest_first()
+        #filtration.sort_price_lowest_first()
 
     def report_results(self):
-        hotel_boxes = self.find_element(By.ID,
-            'hotellist_inner'
-        )
+        wait = WebDriverWait(self, 10)
+        hotel_boxes = wait.until(
+            EC.presence_of_all_elements_located(
+                (By.CSS_SELECTOR, '[data-testid="property-card"]')
+        ))
 
-        report = BookingReport(hotel_boxes)
+        hotel_boxes = self.find_elements(By.CSS_SELECTOR,
+            '[data-testid="property-card"]'
+        )
+        
         table = PrettyTable(
             field_names=["Hotel Name", "Hotel Price", "Hotel Score"]
         )
-        table.add_rows(report.pull_deal_box_attributes())
+
+        collection = []
+        for index, deal_box in enumerate(hotel_boxes):
+
+            if(index == len(hotel_boxes) - 1):
+                break
+            
+            else:
+                # Wait for and immediately extract the hotel name text
+                hotel_name = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="title"]'))
+                ).text
+
+                hotel_name = deal_box.find_element(By.CSS_SELECTOR,
+                    '[data-testid="title"]'
+                ).text.strip()
+                
+                hotel_price = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="price-and-discounted-price"]'))
+                ).text
+
+                hotel_price = deal_box.find_element(By.CSS_SELECTOR,
+                    '[data-testid="price-and-discounted-price"]'
+                ).text.strip()
+
+                hotel_score = wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="review-score"]'))
+                ).text
+
+                hotel_score = deal_box.find_element(By.CSS_SELECTOR,
+                    '[data-testid="review-score"]'
+                ).text.strip()
+
+                collection.append(
+                    [hotel_name, hotel_price, hotel_score]
+                )
+            
+        
+        table.add_rows(collection)
         print(table)
+    
