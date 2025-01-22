@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import time
+import pandas as pd
 
 url = "https://www.timesjobs.com/candidate/job-search.html?searchType=personalizedSearch&from=submit&searchTextSrc=&searchTextText=&txtKeywords=python&txtLocation="
 
@@ -33,6 +34,7 @@ def job_filtering():
     skill_input = [skill.strip().lower() for skill in skill_input]
     print(f'Filtering jobs by {skill_input}:')
 
+    valid_jobs = []
 
     jobs = soup.find_all('li', class_ = 'clearfix job-bx wht-shd-bx')
     valid_dates = ['0 days ago', '1 days ago', '2 days ago', '3 days ago', 'few days ago']
@@ -53,11 +55,23 @@ def job_filtering():
                     file.write(f'Company Name: {company_name}\n')
                     file.write(f'Skills: {skills_list}\n')
                     file.write(f'Posted Date: {posted_date}\n')
+                
+                valid_job_entry = {
+                    'company_name': company_name,
+                    'skills': skills_list,
+                    'posted_date': posted_date
+                }
+                valid_jobs.append(valid_job_entry)
                 #print(company_name)
                 #for skill in skills_list:
                 #    if skill != '':
                 #        print(skill, end = ', ')    #ends a line with a comma
                 print(f'Job {index} saved to posts folder')
+
+    valid_jobs.sort(key = lambda x: x['posted_date'], reverse = True)
+    jobs_dataframe = pd.DataFrame(valid_jobs)
+    print(jobs_dataframe.head())
+    jobs_dataframe.to_csv('jobs.csv', index = False)
 
 
 if __name__ == '__main__':
